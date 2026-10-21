@@ -2,6 +2,9 @@
   <PropertyGroup><TargetFramework>net9.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>  <UserSecretsId>65d1ff19-0601-4708-ae96-013a6bee2c81</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
+    <Content Remove="appsettings.Development.json" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\ApiNetCore.Application\ApiNetCore.Application.csproj" />
     <ProjectReference Include="..\ApiNetCore.Infrastructure\ApiNetCore.Infrastructure.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
@@ -11,5 +14,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="appsettings.Development.json" />
   </ItemGroup>
 </Project>
