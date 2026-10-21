@@ -38,6 +38,11 @@ var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationExcep
 if (jwtKey.StartsWith("CHANGE_ME", StringComparison.OrdinalIgnoreCase) || Encoding.UTF8.GetByteCount(jwtKey) < 32)
     throw new InvalidOperationException("Set Jwt:Key to a random secret of at least 32 bytes using user secrets or environment variables.");
 var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+Console.WriteLine(
+    $"Environment: {builder.Environment.EnvironmentName}");
+
+Console.WriteLine(
+    $"Jwt:Key exists: {!string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Key"])}");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
     options.TokenValidationParameters = new TokenValidationParameters

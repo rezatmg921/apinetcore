@@ -7,9 +7,14 @@ public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<App
 {
     public AppDbContext CreateDbContext(string[] args)
     {
-        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-            ?? "Server=(localdb)\\MSSQLLocalDB;Database=ApiNetCoreDb;Trusted_Connection=True;TrustServerCertificate=True";
-        var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlServer(connectionString).Options;
+        var connectionString =
+     Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+     ?? "Data Source=IT-PC1\\MSSQLIT1;Initial Catalog=ApiNetCoreDb;Integrated Security=True;MultipleActiveResultSets=True;TrustServerCertificate=True";
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlServer(connectionString)
+            .Options;
+
         return new AppDbContext(options);
     }
 }
