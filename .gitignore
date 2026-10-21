@@ -1,0 +1,12 @@
+## .NET build output
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+
+## Secrets / local config
+**/appsettings.Local.json
+.env
+.env.*
+!.env.example
