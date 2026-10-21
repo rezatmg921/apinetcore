@@ -19,3 +19,5 @@ jobs:
         run: dotnet restore ApiNetCore.sln
       - name: Build
         run: dotnet build ApiNetCore.sln --configuration Release --no-restore
+      - name: Test
+        run: dotnet test ApiNetCore.sln --configuration Release --no-build
