@@ -3,8 +3,8 @@ using ApiNetCore.Api.Middleware;
 using ApiNetCore.Application.Abstractions;
 using ApiNetCore.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
@@ -64,29 +64,29 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapHealthChecks("/health/live", new HealthCheckOptions
-{
-    Predicate = _ => false
-})
-.WithTags("Health")
-.WithOpenApi()
-.AllowAnonymous();
+// Minimal API health endpoints are discoverable by Swagger.
+app.MapGet("/health/live", (HealthCheckService healthChecks, CancellationToken ct) =>
+        ExecuteHealthCheckAsync(healthChecks, _ => false, ct))
+    .WithTags("Health")
+    .WithSummary("Liveness probe")
+    .Produces(StatusCodes.Status200OK)
+    .AllowAnonymous();
 
-app.MapHealthChecks("/health/ready", new HealthCheckOptions
-{
-    Predicate = check => check.Tags.Contains("ready")
-})
-.WithTags("Health")
-.WithOpenApi()
-.AllowAnonymous();
+app.MapGet("/health/ready", (HealthCheckService healthChecks, CancellationToken ct) =>
+        ExecuteHealthCheckAsync(healthChecks, check => check.Tags.Contains("ready"), ct))
+    .WithTags("Health")
+    .WithSummary("Readiness probe, including database connectivity")
+    .Produces(StatusCodes.Status200OK)
+    .Produces(StatusCodes.Status503ServiceUnavailable)
+    .AllowAnonymous();
 
-app.MapHealthChecks("/health", new HealthCheckOptions
-{
-    Predicate = check => check.Tags.Contains("ready")
-})
-.WithTags("Health")
-.WithOpenApi()
-.AllowAnonymous();
+app.MapGet("/health", (HealthCheckService healthChecks, CancellationToken ct) =>
+        ExecuteHealthCheckAsync(healthChecks, check => check.Tags.Contains("ready"), ct))
+    .WithTags("Health")
+    .WithSummary("Health check, including database connectivity")
+    .Produces(StatusCodes.Status200OK)
+    .Produces(StatusCodes.Status503ServiceUnavailable)
+    .AllowAnonymous();
 
 if (app.Environment.IsDevelopment())
 {
@@ -115,6 +115,27 @@ app.MapPost("/api/todos", async (CreateTodoRequest request, ITodoRepository repo
     await repository.SaveChangesAsync(ct);
     return Results.Created($"/api/todos/{item.Id}", item);
 }).WithTags("Todos").RequireAuthorization();
+
+static async Task<IResult> ExecuteHealthCheckAsync(
+    HealthCheckService healthChecks,
+    Func<HealthCheckRegistration, bool> predicate,
+    CancellationToken cancellationToken)
+{
+    var report = await healthChecks.CheckHealthAsync(predicate, cancellationToken);
+    var statusCode = report.Status == HealthStatus.Healthy
+        ? StatusCodes.Status200OK
+        : StatusCodes.Status503ServiceUnavailable;
+
+    var response = new
+    {
+        status = report.Status.ToString(),
+        checks = report.Entries.ToDictionary(
+            entry => entry.Key,
+            entry => entry.Value.Status.ToString())
+    };
+
+    return Results.Json(response, statusCode: statusCode);
+}
 
 app.Run();
 
