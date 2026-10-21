@@ -36,6 +36,7 @@ User Secrets are for local development only. Use a managed secret store or envir
 ```bash
 dotnet restore ApiNetCore.sln
 dotnet build ApiNetCore.sln
+dotnet test ApiNetCore.sln
 dotnet run --project src/ApiNetCore.Api
 ```
 
