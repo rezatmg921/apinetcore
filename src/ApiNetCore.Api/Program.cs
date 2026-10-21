@@ -1,0 +1,70 @@
+using System.Text;
+using ApiNetCore.Api.Middleware;
+using ApiNetCore.Application.Abstractions;
+using ApiNetCore.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "ApiNetCore API", Version = "v1" });
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization", Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT",
+        In = ParameterLocation.Header, Description = "Enter a JWT bearer token."
+    });
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        { new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } }, Array.Empty<string>() }
+    });
+});
+
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (!string.IsNullOrWhiteSpace(connectionString))
+    builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(connectionString));
+builder.Services.AddScoped<ITodoRepository, TodoRepository>();
+
+var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key configuration is required.");
+if (Encoding.UTF8.GetByteCount(jwtKey) < 32)
+    throw new InvalidOperationException("Jwt:Key must be at least 32 bytes. Configure it with user secrets or an environment variable.");
+var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true, ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidateAudience = true, ValidAudience = builder.Configuration["Jwt:Audience"],
+        ValidateLifetime = true, ValidateIssuerSigningKey = true, IssuerSigningKey = signingKey,
+        ClockSkew = TimeSpan.FromSeconds(30)
+    };
+});
+builder.Services.AddAuthorization();
+
+var app = builder.Build();
+app.UseExceptionHandler();
+if (app.Environment.IsDevelopment()) { app.UseSwagger(); app.UseSwaggerUI(); }
+app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapGet("/health", () => Results.Ok(new { status = "Healthy" })).WithTags("Health").AllowAnonymous();
+app.MapGet("/api/todos", async (ITodoRepository repository, CancellationToken ct) => Results.Ok(await repository.GetAllAsync(ct)))
+    .WithTags("Todos").RequireAuthorization();
+app.MapPost("/api/todos", async (CreateTodoRequest request, ITodoRepository repository, CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Title)) return Results.ValidationProblem(new Dictionary<string, string[]> { ["title"] = ["Title is required."] });
+    var item = new ApiNetCore.Domain.Entities.TodoItem(request.Title);
+    await repository.AddAsync(item, ct);
+    await repository.SaveChangesAsync(ct);
+    return Results.Created($"/api/todos/{item.Id}", item);
+}).WithTags("Todos").RequireAuthorization();
+app.Run();
+
+public sealed record CreateTodoRequest(string Title);
