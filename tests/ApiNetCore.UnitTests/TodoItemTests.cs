@@ -1,3 +1,4 @@
+using Xunit;
 using ApiNetCore.Domain.Entities;
 
 namespace ApiNetCore.UnitTests;
