@@ -1,12 +1,13 @@
-using System.Text;
 using ApiNetCore.Api.Authentication;
 using ApiNetCore.Api.Middleware;
 using ApiNetCore.Application.Abstractions;
 using ApiNetCore.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,6 +31,11 @@ builder.Services.AddSwaggerGen(options =>
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.");
 builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(connectionString));
+builder.Services
+    .AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>(
+        "database",
+        tags: ["ready"]);
 builder.Services.AddScoped<ITodoRepository, TodoRepository>();
 builder.Services.AddSingleton<ITokenService, JwtTokenService>();
 builder.Services.AddSingleton<DemoCredentialValidator>();
@@ -58,8 +64,29 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }))
-    .WithTags("Health").AllowAnonymous();
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false
+})
+.WithTags("Health")
+.WithOpenApi()
+.AllowAnonymous();
+
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+})
+.WithTags("Health")
+.WithOpenApi()
+.AllowAnonymous();
+
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+})
+.WithTags("Health")
+.WithOpenApi()
+.AllowAnonymous();
 
 if (app.Environment.IsDevelopment())
 {
