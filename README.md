@@ -1,53 +1,100 @@
 # ApiNetCore
 
-A starter ASP.NET Core Web API built with .NET 9, Clean Architecture, SQL Server, JWT bearer authentication, Swagger/OpenAPI, and centralized exception handling.
+A starter ASP.NET Core Web API using .NET 9, Clean Architecture, SQL Server, JWT bearer authentication, Swagger/OpenAPI, and centralized exception handling.
 
-> **Runtime note:** .NET 9 reached end of support in May 2026. This repository targets .NET 9 as requested; for a new production system, consider upgrading to a supported LTS release.
+> **Runtime note:** .NET 9 support ended in May 2026. This repository targets .NET 9 as requested; for a new production system, prefer a currently supported LTS release.
 
-## Solution structure
+## Architecture
 
-```text
-src/
-  ApiNetCore.Domain/          # Entities and domain rules
-  ApiNetCore.Application/     # Use cases, DTOs, abstractions, validation
-  ApiNetCore.Infrastructure/  # EF Core, SQL Server, persistence, JWT services
-  ApiNetCore.Api/             # HTTP endpoints, middleware, Swagger, composition root
-```
+- **Domain** — entities and domain rules
+- **Application** — abstractions and application contracts
+- **Infrastructure** — EF Core, SQL Server, persistence
+- **Api** — HTTP endpoints, JWT validation, Swagger, exception handling
 
-## Prerequisites
+## Requirements
 
 - .NET 9 SDK
-- SQL Server (LocalDB, SQL Server Express, or a server instance)
+- SQL Server or SQL Server LocalDB
+- Optional: `dotnet-ef` CLI tool for migrations
 
-## Configure
+## Configure secrets
 
-Set `ConnectionStrings:DefaultConnection` and `Jwt:Key` using user secrets or environment variables. Never commit production secrets.
+The app intentionally refuses to start with the placeholder JWT key. From the repository root:
 
 ```bash
 dotnet user-secrets init --project src/ApiNetCore.Api
+dotnet user-secrets set "Jwt:Key" "$(openssl rand -base64 48)" --project src/ApiNetCore.Api
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=(localdb)\\MSSQLLocalDB;Database=ApiNetCoreDb;Trusted_Connection=True;TrustServerCertificate=True" --project src/ApiNetCore.Api
-dotnet user-secrets set "Jwt:Key" "replace-with-a-random-secret-at-least-32-characters" --project src/ApiNetCore.Api
+dotnet user-secrets set "Auth:DemoUsername" "demo" --project src/ApiNetCore.Api
+dotnet user-secrets set "Auth:DemoPassword" "replace-with-a-long-random-password" --project src/ApiNetCore.Api
 ```
+
+User Secrets are for local development only. Use a managed secret store or environment variables in deployed environments. The demo credentials are not a production identity system.
 
 ## Build and run
 
 ```bash
-dotnet restore
-dotnet build
+dotnet restore ApiNetCore.sln
+dotnet build ApiNetCore.sln
 dotnet run --project src/ApiNetCore.Api
 ```
 
-Open `/swagger` in Development to explore the API. Apply database migrations with the EF Core tools after adding migrations to the Infrastructure project.
+When running in Development, open the `/swagger` page shown by the launch profile.
 
-## Included starter features
+## Database migrations
 
-- Clean Architecture project separation
-- EF Core SQL Server registration and DbContext
-- JWT bearer authentication configuration
-- Swagger/OpenAPI with Bearer security definition
-- Centralized JSON exception handling and Problem Details responses
-- Health endpoint and sample protected endpoint
+Install the EF CLI if needed and create/apply the initial migration:
 
-## Security notes
+```bash
+dotnet tool install --global dotnet-ef --version 9.0.0
+dotnet ef migrations add InitialCreate --project src/ApiNetCore.Infrastructure --startup-project src/ApiNetCore.Api --output-dir Persistence/Migrations
+dotnet ef database update --project src/ApiNetCore.Infrastructure --startup-project src/ApiNetCore.Api
+```
 
-Use a strong randomly generated JWT signing key, configure HTTPS, keep secrets out of source control, and replace demo authentication/token issuance with your real identity provider or user store before production use.
+Review generated migrations before applying them to shared or production databases.
+
+## Endpoints
+
+| Method | Path | Access | Purpose |
+| --- | --- | --- | --- |
+| GET | `/health` | Anonymous | Health check |
+| POST | `/auth/token` | Development only | Demo credentials to JWT |
+| GET | `/api/todos` | Bearer token | List todo items |
+| POST | `/api/todos` | Bearer token | Create a todo item |
+
+### Request a development token
+
+```http
+POST /auth/token
+Content-Type: application/json
+
+{
+  "username": "demo",
+  "password": "your-configured-demo-password"
+}
+```
+
+Use the returned `accessToken` as a Bearer token in Swagger's **Authorize** dialog. The demo token endpoint is deliberately registered only in the Development environment. Replace it with a real identity provider and user store before production.
+
+### Create a todo
+
+```http
+POST /api/todos
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+
+{ "title": "First task" }
+```
+
+## Included
+
+- Layered solution and sample Todo entity/repository
+- SQL Server DbContext and design-time factory for EF tooling
+- JWT validation and development-only demo token issuance
+- Swagger/OpenAPI Bearer configuration
+- Centralized exception handling with Problem Details
+- Basic request validation and health endpoint
+
+## Security and limitations
+
+Never commit credentials or production secrets. Use HTTPS, rate-limit authentication endpoints, and adopt a production identity provider. The starter has not yet been verified by a CI build in this repository; run the build and migration commands above in an environment with the .NET 9 SDK and SQL Server available.
