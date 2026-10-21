@@ -43,11 +43,10 @@ When running in Development, open the `/swagger` page shown by the launch profil
 
 ## Database migrations
 
-Install the EF CLI if needed and create/apply the initial migration:
+The initial `TodoItems` migration is included. Install the EF CLI if needed, then apply it:
 
 ```bash
 dotnet tool install --global dotnet-ef --version 9.0.0
-dotnet ef migrations add InitialCreate --project src/ApiNetCore.Infrastructure --startup-project src/ApiNetCore.Api --output-dir Persistence/Migrations
 dotnet ef database update --project src/ApiNetCore.Infrastructure --startup-project src/ApiNetCore.Api
 ```
 
@@ -89,7 +88,7 @@ Content-Type: application/json
 ## Included
 
 - Layered solution and sample Todo entity/repository
-- SQL Server DbContext and design-time factory for EF tooling
+- SQL Server DbContext, design-time factory, and initial EF Core migration
 - JWT validation and development-only demo token issuance
 - Swagger/OpenAPI Bearer configuration
 - Centralized exception handling with Problem Details
@@ -97,4 +96,4 @@ Content-Type: application/json
 
 ## Security and limitations
 
-Never commit credentials or production secrets. Use HTTPS, rate-limit authentication endpoints, and adopt a production identity provider. The starter has not yet been verified by a CI build in this repository; run the build and migration commands above in an environment with the .NET 9 SDK and SQL Server available.
+Never commit credentials or production secrets. Use HTTPS, rate-limit authentication endpoints, and adopt a production identity provider. GitHub Actions is configured to restore, build, and run unit tests on pushes and pull requests. The first CI run should be checked before treating the starter as verified. Run the database migration command above in an environment with SQL Server available.
